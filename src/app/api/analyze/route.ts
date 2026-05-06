@@ -253,6 +253,7 @@ Requirements:
     statsData.regression_simple.sort((a: any, b: any) => b.R_squared - a.R_squared);
 
     let insights = '';
+    let strategyData: any = null;
     const rawKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
     const apiKey = rawKey.trim().replace(/['"]/g, '');
     
@@ -260,23 +261,67 @@ Requirements:
       try {
         const topDrivers = statsData.regression_simple.slice(0, 3).map((r:any) => r.메뉴변수).join(', ');
         const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.메뉴).join(', ');
+        const trend = statsData.trend_analysis.추세_기울기 > 0 ? '상승' : '하락';
         
-        const prompt = `스파/매장 매출 분석 전문가로서 다음 통계 데이터를 기반으로 전략 리포트를 작성하라.
-        [데이터 요약]
-        - 총 누적 매출: ${totalSalesAccum.toLocaleString()}원
-        - 성장 추세: ${statsData.trend_analysis.추세_기울기 > 0 ? '상승' : '하락'}
-        - 핵심 동인(매출 견인): ${topDrivers}
-        - 불안정 메뉴(매출 기복 심함): ${unstable}
-        
-        [작성 규칙]
-        1. 반드시 [주요 발견사항], [강점], [약점], [개선 방향] 4가지 섹션으로 나누어 작성할 것. (대괄호 필수, 마크다운 ** 기호 절대 금지)
-        2. 각 섹션 내에서는 '- 항목명: 설명' 구조의 평문 불릿 포인트로 작성할 것 (* 기호 대신 - 사용).
-        3. 핵심 동인과 불안정 메뉴를 구체적으로 언급할 것.`;
+        const prompt = `당신은 외식업/스파 업종 전문 경영 컨설턴트입니다. 아래 매출 데이터를 바탕으로 5가지 전략 영역에 대한 구체적인 액션 플랜을 작성하세요.
+
+[데이터 요약]
+- 총 누적 매출: ${totalSalesAccum.toLocaleString()}원
+- 성장 추세: ${trend}
+- 핵심 매출 견인 메뉴: ${topDrivers}
+- 매출 기복 심한 메뉴: ${unstable}
+
+[출력 형식]
+반드시 아래 JSON 형식으로만 응답하라. 다른 텍스트나 마크다운 코드블록(\'\'\'json 등) 없이 순수 JSON만 출력.
+
+{
+  "summary": {
+    "findings": ["발견사항1", "발견사항2", "발견사항3"],
+    "improvements": ["개선방향1", "개선방향2", "개선방향3"]
+  },
+  "strategies": {
+    "product": {
+      "sections": [
+        { "icon": "🆕", "title": "신제품 전략", "items": ["항목명: 설명", "항목명: 설명"] },
+        { "icon": "🍱", "title": "세트메뉴 전략", "items": ["항목명: 설명", "항목명: 설명"] },
+        { "icon": "🌸", "title": "시즌메뉴 전략", "items": ["항목명: 설명", "항목명: 설명"] }
+      ]
+    },
+    "customer": {
+      "sections": [
+        { "icon": "🔁", "title": "고정고객 관리", "items": ["항목명: 설명", "항목명: 설명"] },
+        { "icon": "✨", "title": "신규고객 유치", "items": ["항목명: 설명", "항목명: 설명"] }
+      ]
+    },
+    "event": {
+      "sections": [
+        { "icon": "🗓️", "title": "시즌별 이벤트", "items": ["항목명: 설명", "항목명: 설명"] },
+        { "icon": "🎁", "title": "고객별 이벤트", "items": ["항목명: 설명", "항목명: 설명"] }
+      ]
+    },
+    "price": {
+      "sections": [
+        { "icon": "📊", "title": "경쟁사 대비 가격전략", "items": ["항목명: 설명", "항목명: 설명", "항목명: 설명"] }
+      ]
+    },
+    "operation": {
+      "sections": [
+        { "icon": "👤", "title": "내부직원 관리", "items": ["항목명: 설명", "항목명: 설명"] },
+        { "icon": "🏆", "title": "동기부여 전략", "items": ["항목명: 설명", "항목명: 설명"] }
+      ]
+    }
+  }
+}
+
+각 items 배열의 항목은 '항목명: 구체적 설명' 형태로, 실제 데이터에서 발견된 사실을 근거로 실행 가능한 액션 플랜을 3~4개씩 작성하라.`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
         });
         
         const data = await response.json();
@@ -284,12 +329,23 @@ Requirements:
            throw new Error(data.error?.message || JSON.stringify(data));
         }
         
-        let rawInsights = data.candidates[0].content.parts[0].text;
-        // 마크다운 잔재(**, ## 등) 및 글머리기호(*)를 프론트엔드 파서에 맞게 강제 변환
-        insights = rawInsights.replace(/\*\*/g, '').replace(/## /g, '').replace(/^\* /gm, '- ');
+        let rawText = data.candidates[0].content.parts[0].text;
+        // JSON 파싱 시도
+        try {
+          // 마크다운 코드블록 제거 후 파싱
+          const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          strategyData = JSON.parse(cleaned);
+          // 구 형식 호환성: summary findings/improvements를 flat text로도 변환
+          const f = strategyData.summary?.findings?.join('\n- ') || '';
+          const im = strategyData.summary?.improvements?.join('\n- ') || '';
+          insights = `[주요 발견사항]\n- ${f}\n\n[개선 방향]\n- ${im}`;
+        } catch {
+          // JSON 파싱 실패 시 기존 텍스트 형식으로 폴백
+          insights = rawText.replace(/\*\*/g, '').replace(/## /g, '').replace(/^\* /gm, '- ');
+        }
       } catch (e: any) {
         console.error("AI Error:", e);
-        insights = `AI 인사이트 생성 오류: ${e.message || String(e)}\n\n(Vercel 서버에서 발생한 실제 에러입니다. 이 화면을 알려주시면 바로 해결해 드리겠습니다.)`;
+        insights = `AI 인사이트 생성 오류: ${e.message || String(e)}`;
       }
     } else {
       insights = "서버에 GOOGLE_API_KEY가 설정되어 있지 않아 AI 분석을 건너뛰었습니다.\n\n[강점]\n- 데이터 분석 완료: 기초적인 통계 분석이 완료되었습니다.";
@@ -305,6 +361,7 @@ Requirements:
       }), 
       statsData,
       insights,
+      strategyData,
       reportReady: false // 웹 환경에서는 Docx 제공 안 함
     });
 

@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine } from 'recharts';
 import styles from './page.module.css';
 
+
 const COLORS = ['#1e3a5f','#2563eb','#0ea5e9','#0d9488','#6366f1','#8b5cf6','#94a3b8'];
 const C = { navy:'#1e3a5f', blue:'#2563eb', light:'#eff6ff', border:'#e2e8f0', text:'#0f172a', sub:'#475569', bg:'#f8fafc' };
 
@@ -109,12 +110,62 @@ function Insights({ text }: { text:string }) {
   );
 }
 
+// ── 전략 탭 정의
+const STRATEGY_TABS = [
+  { key: 'product',     icon: '🍽️', label: '제품 전략' },
+  { key: 'customer',   icon: '👥', label: '고객관리 전략' },
+  { key: 'event',      icon: '🎉', label: '이벤트 전략' },
+  { key: 'price',      icon: '💰', label: '가격 전략' },
+  { key: 'operation',  icon: '🏢', label: '조직관리 전략' },
+];
+
+// ── 전략 컨텐츠 렌더러
+function StrategyCard({ icon, title, items }: { icon: string; title: string; items: string[] }) {
+  return (
+    <div style={{border:`1px solid ${C.border}`,borderRadius:6,padding:'1.2rem 1.4rem',marginBottom:'0.9rem',background:'#fff',boxSizing:'border-box'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'0.8rem'}}>
+        <span style={{fontSize:'1.2rem'}}>{icon}</span>
+        <span style={{fontWeight:800,fontSize:'1rem',color:C.navy}}>{title}</span>
+      </div>
+      <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+        {items.map((item, i) => {
+          const colonIdx = item.indexOf(':');
+          const hasBold = colonIdx > 0 && colonIdx < 25;
+          return (
+            <li key={i} style={{display:'flex',gap:'0.5rem',alignItems:'flex-start',fontSize:'0.9rem',lineHeight:1.7,color:C.sub}}>
+              <span style={{color:C.blue,fontWeight:900,flexShrink:0,marginTop:'0.15rem'}}>•</span>
+              <span>
+                {hasBold ? (<><strong style={{color:C.text,fontWeight:800}}>{item.slice(0,colonIdx)}</strong><span style={{color:'#64748b'}}>: {item.slice(colonIdx+1).trim()}</span></>) : item}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function StrategyTabPanel({ tabKey, strategyData }: { tabKey: string; strategyData: any }) {
+  if (!strategyData || !strategyData[tabKey]) {
+    return <p style={{color:C.sub,fontSize:'0.9rem',textAlign:'center',padding:'2rem 0'}}>분석 데이터를 불러오는 중입니다...</p>;
+  }
+  const d = strategyData[tabKey];
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:'0'}}>
+      {(d.sections||[]).map((sec: any, i: number) => (
+        <StrategyCard key={i} icon={sec.icon||'📌'} title={sec.title} items={sec.items||[]} />
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [dragging, setDragging] = useState(false);
+  const [strategyTab, setStrategyTab] = useState('product');
 
   const processFile = async (file: File) => {
     setFileName(file.name); setUploading(true); setError('');
@@ -427,16 +478,88 @@ export default function Home() {
 
           {/* 4. AI 전략적 제언 */}
           <SecTitle n="Ⅳ" t="전략적 제언 및 Action Plan"/>
-          <div style={{border:`2px solid ${C.navy}`,borderRadius:4,padding:'2rem',position:'relative',overflow:'hidden'}}>
-            <div style={{position:'absolute',top:0,left:0,right:0,height:4,background:C.blue}}/>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem',borderBottom:`1px solid ${C.border}`,paddingBottom:'1rem'}}>
-              <div>
-                <h2 style={{margin:0,fontSize:'1.2rem',fontWeight:900,color:C.navy}}>AI 종합 분석 의견</h2>
-                <p style={{margin:'0.3rem 0 0',fontSize:'0.83rem',color:C.sub}}>데이터 기반 전략 제언 · 작성: 중간계 인트릭스 연구소 · {new Date().toLocaleDateString('ko-KR')}</p>
+
+          {/* 4-0. 주요 발견사항 & 개선 방향 요약 카드 */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1.5rem'}}>
+            {/* 주요 발견사항 */}
+            <div style={{border:`2px solid #d97706`,borderRadius:6,padding:'1.4rem 1.6rem',background:'#fffbeb',position:'relative',overflow:'hidden'}}>
+              <div style={{position:'absolute',top:0,left:0,right:0,height:4,background:'#d97706'}}/>
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
+                <span style={{background:'#d97706',color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.85rem',fontWeight:900}}>주요발견사항</span>
               </div>
-              <div style={{width:56,height:56,borderRadius:'50%',border:`3px solid ${C.navy}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.navy,fontWeight:900,fontSize:'0.75rem',transform:'rotate(-10deg)',flexShrink:0}}>승&nbsp;인</div>
+              {result.strategyData?.summary?.findings?.length > 0 ? (
+                <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+                  {result.strategyData.summary.findings.map((f: string, i: number) => (
+                    <li key={i} style={{display:'flex',gap:'0.5rem',alignItems:'flex-start',fontSize:'0.9rem',lineHeight:1.7,color:'#92400e'}}>
+                      <span style={{color:'#d97706',fontWeight:900,flexShrink:0}}>•</span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Insights text={result.insights?.split('[개선')[0] || ''} />
+              )}
             </div>
-            <Insights text={result.insights}/>
+            {/* 개선 방향 */}
+            <div style={{border:`2px solid ${C.blue}`,borderRadius:6,padding:'1.4rem 1.6rem',background:C.light,position:'relative',overflow:'hidden'}}>
+              <div style={{position:'absolute',top:0,left:0,right:0,height:4,background:C.blue}}/>
+              <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
+                <span style={{background:C.blue,color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.85rem',fontWeight:900}}>개선 방향</span>
+              </div>
+              {result.strategyData?.summary?.improvements?.length > 0 ? (
+                <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+                  {result.strategyData.summary.improvements.map((f: string, i: number) => (
+                    <li key={i} style={{display:'flex',gap:'0.5rem',alignItems:'flex-start',fontSize:'0.9rem',lineHeight:1.7,color:'#1e40af'}}>
+                      <span style={{color:C.blue,fontWeight:900,flexShrink:0}}>•</span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Insights text={result.insights?.split('[개선')[1] ? '[개선' + result.insights.split('[개선')[1] : ''} />
+              )}
+            </div>
+          </div>
+
+          {/* 4-1. 5대 전략 탭 */}
+          <div style={{border:`2px solid ${C.navy}`,borderRadius:6,overflow:'hidden'}}>
+            {/* 탭 헤더 */}
+            <div style={{display:'flex',background:C.navy}}>
+              {STRATEGY_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setStrategyTab(tab.key)}
+                  style={{
+                    flex:1, border:'none', background:'transparent', cursor:'pointer',
+                    padding:'0.85rem 0.4rem',
+                    color: strategyTab === tab.key ? '#fff' : 'rgba(255,255,255,0.55)',
+                    fontWeight: strategyTab === tab.key ? 900 : 600,
+                    fontSize:'0.8rem',
+                    borderBottom: strategyTab === tab.key ? `3px solid ${C.blue}` : '3px solid transparent',
+                    transition:'all 0.15s',
+                    display:'flex',flexDirection:'column',alignItems:'center',gap:'0.25rem',
+                    fontFamily:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif"
+                  }}
+                >
+                  <span style={{fontSize:'1.3rem'}}>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* 탭 바디 */}
+            <div style={{padding:'1.6rem',background:'#f8fafc',minHeight:280}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.2rem'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'0.7rem'}}>
+                  <span style={{fontSize:'1.5rem'}}>{STRATEGY_TABS.find(t=>t.key===strategyTab)?.icon}</span>
+                  <div>
+                    <div style={{fontSize:'1.1rem',fontWeight:900,color:C.navy}}>{STRATEGY_TABS.find(t=>t.key===strategyTab)?.label}</div>
+                    <div style={{fontSize:'0.78rem',color:C.sub}}>데이터 기반 AI 전략 제언 · 중간계 인트릭스 연구소</div>
+                  </div>
+                </div>
+                <div style={{width:44,height:44,borderRadius:'50%',border:`2px solid ${C.navy}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.navy,fontWeight:900,fontSize:'0.65rem',transform:'rotate(-10deg)',flexShrink:0}}>승&nbsp;인</div>
+              </div>
+              <StrategyTabPanel tabKey={strategyTab} strategyData={result.strategyData?.strategies} />
+            </div>
           </div>
 
           {/* 리포트 하단 */}
