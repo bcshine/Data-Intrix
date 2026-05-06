@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
         2. 각 섹션 내에서는 '항목명: 설명' 구조의 불릿 포인트로 작성.
         3. 핵심 동인과 불안정 메뉴를 구체적으로 언급할 것.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
