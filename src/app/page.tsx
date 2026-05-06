@@ -6,7 +6,19 @@ import styles from './page.module.css';
 const COLORS = ['#1e3a5f','#2563eb','#0ea5e9','#0d9488','#6366f1','#8b5cf6','#94a3b8'];
 const C = { navy:'#1e3a5f', blue:'#2563eb', light:'#eff6ff', border:'#e2e8f0', text:'#0f172a', sub:'#475569', bg:'#f8fafc' };
 
-const wrap: React.CSSProperties = { maxWidth:960, margin:'0 auto', background:'#fff', padding:'3rem 4rem', boxShadow:'0 4px 24px rgba(0,0,0,0.08)', fontFamily:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif", color:C.text };
+const wrap: React.CSSProperties = { 
+  maxWidth: 960, 
+  width: '95%',
+  margin: '2rem auto', 
+  background: '#fff', 
+  padding: '3rem 4rem', 
+  boxShadow: '0 10px 40px rgba(0,0,0,0.1)', 
+  fontFamily: "'Noto Sans KR','Apple SD Gothic Neo',sans-serif", 
+  color: C.text,
+  borderRadius: 8,
+  position: 'relative',
+  zIndex: 1
+};
 
 function Divider() { return <hr style={{border:'none',borderTop:`2px solid ${C.navy}`,margin:'2rem 0'}} />; }
 
@@ -134,9 +146,9 @@ export default function Home() {
   if(!result) return (
     <main style={{background:'#f1f5f9',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>
       <div style={{background:'#fff',padding:'3rem',borderRadius:8,boxShadow:'0 4px 20px rgba(0,0,0,0.06)',textAlign:'center',maxWidth:480,width:'100%'}}>
-        <div style={{width:56,height:56,background:C.navy,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 1.2rem',fontSize:'1.5rem'}}>📊</div>
-        <h1 style={{fontSize:'1.4rem',fontWeight:900,color:C.navy,margin:'0 0 0.5rem'}}>매출 분석 리포트 생성기</h1>
-        <p style={{color:C.sub,fontSize:'0.88rem',margin:'0 0 2rem',lineHeight:1.6}}>POS 매출 엑셀 데이터를 업로드하시면<br/>AI가 자동으로 전문 분석 리포트를 생성합니다.</p>
+        <div style={{width:64,height:64,background:C.navy,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 1.5rem',fontSize:'1.8rem',boxShadow:'0 4px 12px rgba(30,58,95,0.2)'}}>📊</div>
+        <h1 style={{fontSize:'1.6rem',fontWeight:900,color:C.navy,margin:'0 0 0.8rem',letterSpacing:'-0.5px'}}>매출 분석 리포트 생성기</h1>
+        <p style={{color:C.sub,fontSize:'0.95rem',margin:'0 0 2.5rem',lineHeight:1.7}}>POS 매출 엑셀 데이터를 업로드하시면<br/>AI가 자동으로 전문 분석 리포트를 생성합니다.</p>
         {uploading ? (
           <div><div className={styles.spinner} style={{margin:'0 auto 1rem'}}/><p style={{color:C.sub,fontSize:'0.88rem'}}>{fileName} 분석 중... (약 30초 소요)</p></div>
         ):(
