@@ -132,7 +132,8 @@ export async function POST(req: NextRequest) {
         const regData = vec.map((v, i) => [v, targetVec[i]]);
         try {
           const model = ss.linearRegression(regData);
-          const r2 = ss.rSquared(regData, model);
+          const line = ss.linearRegressionLine(model);
+          const r2 = ss.rSquared(regData, line);
           statsData.regression_simple.push({
             메뉴변수: cat,
             회귀계수: model.m,
@@ -188,16 +189,6 @@ export async function POST(req: NextRequest) {
       statsData,
       insights,
       reportReady: false // 웹 환경에서는 Docx 제공 안 함
-    });
-
-  } catch (error: any) {
-    console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}   insights,
-      monthlyCaption,
-      categoryCaption,
-      reportReady: fs.existsSync(path.join(projectRoot, 'DataIntrix_Consulting_Report.docx'))
     });
 
   } catch (error: any) {
