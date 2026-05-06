@@ -47,6 +47,7 @@ function Caption({ text }: { text:string }) {
 function Insights({ text }: { text:string }) {
   // 섹션 레이블 색상 매핑
   const sectionColor: Record<string, string> = {
+    '주요': '#d97706', '발견': '#d97706',
     '강점': '#059669', '장점': '#059669',
     '약점': '#dc2626', '단점': '#dc2626',
     '개선': '#2563eb', '방향': '#2563eb', 'Action': '#7c3aed', 'action': '#7c3aed'
