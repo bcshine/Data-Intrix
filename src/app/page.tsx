@@ -20,11 +20,11 @@ const wrap: React.CSSProperties = {
   zIndex: 1
 };
 
-function Divider() { return <hr style={{border:'none',borderTop:`2px solid ${C.navy}`,margin:'2rem 0'}} />; }
+function Divider() { return <hr className="pdf-keep-next" style={{border:'none',borderTop:`2px solid ${C.navy}`,margin:'2rem 0'}} />; }
 
 function SecTitle({ n, t }: { n:string; t:string }) {
   return (
-    <div style={{display:'flex',alignItems:'center',gap:'0.9rem',margin:'2.5rem 0 1.2rem',borderLeft:`6px solid ${C.blue}`,paddingLeft:'1rem',background:C.light,padding:'0.9rem 1rem',borderRadius:'0 4px 4px 0'}}>
+    <div className="pdf-keep-next" style={{display:'flex',alignItems:'center',gap:'0.9rem',margin:'2.5rem 0 1.2rem',borderLeft:`6px solid ${C.blue}`,paddingLeft:'1rem',background:C.light,padding:'0.9rem 1rem',borderRadius:'0 4px 4px 0', pageBreakAfter: 'avoid', pageBreakInside: 'avoid'}}>
       <span style={{background:C.navy,color:'#fff',padding:'0.3rem 0.9rem',borderRadius:3,fontSize:'0.95rem',fontWeight:900,letterSpacing:1}}>{n}</span>
       <h2 style={{margin:0,fontSize:'1.3rem',fontWeight:900,color:C.navy,letterSpacing:'-0.3px'}}>{t}</h2>
     </div>
@@ -33,7 +33,7 @@ function SecTitle({ n, t }: { n:string; t:string }) {
 
 function Box({ title, children, half=false }: { title:string; children:React.ReactNode; half?:boolean }) {
   return (
-    <div style={{border:`1px solid ${C.border}`,borderRadius:4,padding:'1.2rem 1.4rem',width:half?'calc(50% - 0.5rem)':'100%',marginBottom:'1rem',boxSizing:'border-box'}}>
+    <div style={{border:`1px solid ${C.border}`,borderRadius:4,padding:'1.2rem 1.4rem',width:half?'calc(50% - 0.5rem)':'100%',marginBottom:'1rem',boxSizing:'border-box', pageBreakInside: 'avoid'}}>
       <div style={{fontSize:'1.05rem',fontWeight:800,color:C.navy,borderBottom:`2px solid ${C.light}`,paddingBottom:'0.6rem',marginBottom:'1rem',letterSpacing:'-0.2px'}}>{title}</div>
       {children}
     </div>
@@ -167,17 +167,67 @@ export default function Home() {
     </main>
   );
 
-  const exportToWord = () => {
-    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export</title></head><body>";
-    const footer = "</body></html>";
-    const sourceHTML = header + document.getElementById("report-wrapper")?.innerHTML + footer;
-    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-    const fileDownload = document.createElement("a");
-    document.body.appendChild(fileDownload);
-    fileDownload.href = source;
-    fileDownload.download = '매출분석_전략리포트.doc';
-    fileDownload.click();
-    document.body.removeChild(fileDownload);
+  const exportToPDF = async () => {
+    const btn = document.getElementById('export-btn');
+    if (btn) btn.innerText = 'PDF 굽는 중... ⏳';
+
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12; // 12mm 여백
+      const contentWidth = pdfWidth - margin * 2;
+      let currentY = margin;
+      
+      // 버튼 숨기기
+      if (btn) btn.style.display = 'none';
+
+      // 껍데기가 아닌 안쪽 블록(Box, Title 등)들을 하나씩 찰칵 찍어서 조립
+      const elements = document.getElementById("report-wrapper")?.children;
+      if (!elements) return;
+
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i] as HTMLElement;
+        if (el.tagName === 'STYLE' || el.tagName === 'BUTTON') continue;
+        
+        // 요소 높이가 0이면 건너뜀 (빈 조각 방지)
+        if (el.offsetHeight === 0) continue;
+
+        // 투명 배경 방지를 위해 캔버스를 흰색으로 고정
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        
+        const elHeightMm = (canvas.height * contentWidth) / canvas.width;
+        
+        let spaceNeeded = elHeightMm;
+        // 제목이나 구분선일 때 남은 공간이 75mm(약 1/4) 미만이면, 제목만 덩그러니 남는 고아(Orphan) 현상을 막기 위해 통째로 다음 장으로 넘김
+        if ((el.className || '').includes('pdf-keep-next') && (pdfHeight - margin - currentY) < 75) {
+          spaceNeeded = 9999;
+        }
+        
+        // 현재 조각이 남은 페이지 공간을 넘어서면 새 페이지로 넘김 (차트 두동강 완벽 방지)
+        if (currentY + spaceNeeded > pdfHeight - margin) {
+          pdf.addPage();
+          currentY = margin;
+        }
+        
+        pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, elHeightMm);
+        currentY += elHeightMm + 4; // 요소 간 4mm 간격
+      }
+
+      pdf.save(`${fileName.replace(/\.[^/.]+$/, '')}_AI_전략리포트.pdf`);
+      
+      // 버튼 복구
+      if (btn) btn.style.display = 'inline-block';
+      
+    } catch(e) {
+      alert("PDF 변환 중 오류가 발생했습니다.");
+    } finally {
+      if (btn) btn.innerText = 'PDF로 내보내기 📄';
+    }
   };
 
   /* ── 리포트 화면 ── */
@@ -186,8 +236,8 @@ export default function Home() {
       <div id="report-wrapper" style={wrap}>
 
         {/* 표지 */}
-        <div style={{position: 'relative', textAlign:'center',padding:'3rem 0 2rem',borderBottom:`4px solid ${C.navy}`}}>
-          <button onClick={exportToWord} style={{position: 'absolute', top: '1.5rem', right: '0', background: C.navy, color: '#fff', border: 'none', padding: '0.6rem 1rem', borderRadius: 4, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>워드로 내보내기 📄</button>
+        <div className="print-avoid-break" style={{position: 'relative', textAlign:'center',padding:'3rem 0 2rem',borderBottom:`4px solid ${C.navy}`}}>
+          <button id="export-btn" onClick={exportToPDF} style={{position: 'absolute', top: '1.5rem', right: '0', background: C.navy, color: '#fff', border: 'none', padding: '0.6rem 1rem', borderRadius: 4, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>PDF로 내보내기 📄</button>
           <p style={{color:C.sub,fontSize:'0.85rem',fontWeight:600,margin:'0 0 0.8rem',letterSpacing:2}}>CONFIDENTIAL · BUSINESS INTELLIGENCE REPORT</p>
           <h1 style={{fontSize:'2.2rem',fontWeight:900,color:C.navy,margin:'0 0 0.5rem',lineHeight:1.3}}>매출 데이터 분석 및<br/>전략 리포트</h1>
           <p style={{color:C.blue,fontSize:'1rem',fontWeight:700,margin:'0 0 2rem'}}>{fileName.replace(/\.[^/.]+$/,'')}</p>

@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. 만약 일반적인 표 형태로 파싱하지 못했다면, 아주 특수한 형태(기존 SPA 원본 포스기 데이터) 파싱 시도
+    // 2. 특수 양식 하드코딩 파싱 (기존 SPA 양식 등)
     if (wideData.length === 0) {
       const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
       const wideDataMap: Record<string, any> = {};
@@ -105,10 +105,62 @@ export async function POST(req: NextRequest) {
           wideDataMap[currentStart][category] = cleanNumeric(row[7]);
         }
       }
-      wideData = Object.values(wideDataMap).sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
+      if (Object.keys(wideDataMap).length > 0) {
+        wideData = Object.values(wideDataMap).sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
+      }
     }
 
-    if (wideData.length === 0) throw new Error("분석할 수 없는 데이터 양식입니다. 날짜(YYYY-MM-DD 등)와 카테고리별 매출이 포함된 엑셀 파일을 올려주세요.");
+    // 3. AI 동적 전처리기 (모든 하드코딩 룰이 실패했을 경우 최후의 보루)
+    if (wideData.length === 0 && jsonObjects.length > 0) {
+      console.log("Rule-based parsing failed. Engaging AI Dynamic Preprocessor...");
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' }); // 코드 작성을 위해 추론능력이 높은 pro 모델 사용
+      
+      const sampleData = JSON.stringify(jsonObjects.slice(0, 50), null, 2);
+      
+      const prompt = `
+You are an expert data engineer.
+I have a messy POS Excel file parsed into JSON objects. The user wants to aggregate this data into a monthly summary.
+Here are the first 50 rows of the data:
+
+${sampleData}
+
+Write a Javascript function body that processes the \`rows\` array and returns an aggregated array of objects.
+Requirements:
+1. The input variable is \`rows\` (Array of objects).
+2. The output MUST be an array of objects where each object represents one month.
+3. Each output object MUST have a \`Period_Start\` key formatted strictly as "YYYY-MM" (e.g. "2024-01").
+4. The rest of the keys in the output object should be the names of the categories/menus, and the values should be the SUM of the sales amounts for that category in that month.
+5. EXCLUDE totals, subtotals, or summary columns (like "총매출", "합계", etc) from being category keys.
+6. Return ONLY the raw javascript code for the inside of the function. DO NOT include markdown, \`\`\`javascript, or function wrapper. Just the code to execute.
+7. Use defensive programming (check for nulls, handle string numbers by stripping commas and parsing float, handle weird date formats by using Regex to find YYYY and MM).
+`;
+
+      try {
+        const result = await model.generateContent(prompt);
+        let jsCode = result.response.text();
+        // 마크다운 및 불필요한 래퍼 제거
+        jsCode = jsCode.replace(/```javascript/gi, '').replace(/```js/gi, '').replace(/```/g, '').trim();
+        console.log("AI Generated Parser Code:\n", jsCode);
+        
+        // 동적 파서 실행
+        const dynamicParser = new Function('rows', jsCode);
+        wideData = dynamicParser(jsonObjects);
+        
+        // AI가 만든 데이터가 유효한지 검증
+        if (!Array.isArray(wideData) || wideData.length === 0 || !wideData[0].Period_Start) {
+          wideData = [];
+        } else {
+          // 날짜순 정렬
+          wideData.sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
+          console.log("AI Preprocessing Successful. Rows:", wideData.length);
+        }
+      } catch (e) {
+        console.error("AI Preprocessor failed:", e);
+      }
+    }
+
+    if (wideData.length === 0) throw new Error("분석할 수 없는 데이터 양식입니다. 엑셀의 구조가 너무 복잡하여 AI 전처리기도 해독에 실패했습니다. 단순한 표 형태로 수정 후 다시 올려주세요.");
 
     // 빈 값 채우기 및 카테고리 추출
     const categories = new Set<string>();
