@@ -17,6 +17,7 @@
 *.json
 !package.json
 !tsconfig.json
+!vercel.json
 !next.config.ts
 !eslint.config.mjs
 output_charts/
