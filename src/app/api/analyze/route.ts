@@ -32,28 +32,57 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = xlsx.read(arrayBuffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
-    // 1. 데이터 파싱
-    const wideDataMap: Record<string, any> = {};
-    let currentStart = '';
+    // 1. 데이터 파싱 (다양한 포맷 지원)
+    let wideData: any[] = [];
+    const jsonObjects = xlsx.utils.sheet_to_json(worksheet) as Record<string, any>[];
 
-    for (const row of rawData) {
-      const val0 = String(row[0] || '');
-      if (val0.includes('(') && val0.includes('년') && val0.includes('일')) {
-        const dates = parseKoreanDate(val0);
-        if (dates) currentStart = dates.start;
-        continue;
+    if (jsonObjects.length > 0 && jsonObjects[0].Period_Start !== undefined) {
+      // 포맷 A: 파이썬 등에서 이미 전처리된 'regression_ready_data' 스타일
+      wideData = jsonObjects.map(row => {
+        let pStart = String(row.Period_Start).trim();
+        // 엑셀 날짜 일련번호인 경우 변환
+        if (typeof row.Period_Start === 'number') {
+          const d = new Date((row.Period_Start - 25569) * 86400 * 1000);
+          pStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          const m = pStart.match(/^(\d{4})[-/.]?(\d{1,2})/);
+          if (m) pStart = `${m[1]}-${m[2].padStart(2, '0')}`;
+        }
+
+        const newRow: any = { Period_Start: pStart };
+        for (const key of Object.keys(row)) {
+          if (key === 'Period_Start' || key === 'Period_End') continue;
+          let catName = key;
+          // 파이썬 전처리본에서 붙은 'Amt_' 접두사 제거
+          if (catName.startsWith('Amt_')) catName = catName.replace('Amt_', '').replace(/_/g, ' ');
+          newRow[catName] = cleanNumeric(row[key]);
+        }
+        return newRow;
+      });
+    } else {
+      // 포맷 B: 기존 POS 원본 데이터 스타일
+      const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      const wideDataMap: Record<string, any> = {};
+      let currentStart = '';
+
+      for (const row of rawData) {
+        const val0 = String(row[0] || '');
+        if (val0.includes('(') && val0.includes('년') && val0.includes('일')) {
+          const dates = parseKoreanDate(val0);
+          if (dates) currentStart = dates.start;
+          continue;
+        }
+        const category = val0.trim();
+        if (category && !['분류', '합계', 'nan'].includes(category) && currentStart) {
+          if (!wideDataMap[currentStart]) wideDataMap[currentStart] = { Period_Start: currentStart };
+          wideDataMap[currentStart][category] = cleanNumeric(row[7]);
+        }
       }
-      const category = val0.trim();
-      if (category && !['분류', '합계', 'nan'].includes(category) && currentStart) {
-        if (!wideDataMap[currentStart]) wideDataMap[currentStart] = { Period_Start: currentStart };
-        wideDataMap[currentStart][category] = cleanNumeric(row[7]);
-      }
+      wideData = Object.values(wideDataMap).sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
     }
 
-    const wideData = Object.values(wideDataMap).sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
-    if (wideData.length === 0) throw new Error("분석할 데이터가 없습니다.");
+    if (wideData.length === 0) throw new Error("분석할 데이터가 없습니다. 파일 양식을 확인해주세요.");
 
     // 빈 값 채우기 및 카테고리 추출
     const categories = new Set<string>();
