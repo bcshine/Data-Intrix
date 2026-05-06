@@ -1,0 +1,35 @@
+File: 더벨스파콘래드.xlsx
+Sheets: ['항목별 매출']
+
+==================== Sheet: 항목별 매출 ====================
+Shape: (118, 10)
+First 15 rows:
+   (2025년 8월 15일 - 2025년 8월 31일) Unnamed: 1  Unnamed: 2 Unnamed: 3 Unnamed: 4 Unnamed: 5 Unnamed: 6       Unnamed: 7 Unnamed: 8 Unnamed: 9
+0                            NaN        NaN         NaN        NaN        NaN        NaN        NaN              NaN        NaN        NaN
+1                             분류         판매         NaN     정액권 차감        NaN      티켓 차감        NaN  합계\n(A + B + C)      평균 단가     포인트 차감
+2                            NaN         수량       금액(A)         수량      금액(B)         수량      금액(C)              NaN        NaN        NaN
+3                           BODY          2     484,000        NaN        NaN        NaN        NaN          484,000    242,000        NaN
+4                           FACE          4     995,400          1    187,000        NaN        NaN        1,182,400    236,480        NaN
+5                    SPA PACKAGE          4   1,518,000        NaN        NaN        NaN        NaN        1,518,000    379,500        NaN
+6            THE BELLE SIGNATURE         87  22,944,100         12  3,238,675        NaN        NaN       26,182,775    264,472    822,000
+7     THE WELLBEING EDIT(ADD ON)          1     108,000        NaN        NaN        NaN        NaN          108,000    108,000        NaN
+8                             기타        NaN         NaN        NaN        NaN          1    263,500          263,500    263,500        NaN
+9                           프로모션         31   8,925,000        NaN        NaN          2    537,600        9,462,600    286,745        NaN
+10                            합계        129  34,974,500         13  3,425,675          3    801,100       39,201,275    270,354    822,000
+11                           NaN        NaN         NaN        NaN        NaN        NaN        NaN              NaN        NaN        NaN
+12  (2025년 9월 1일 - 2025년 9월 30일)        NaN         NaN        NaN        NaN        NaN        NaN              NaN        NaN        NaN
+13                           NaN        NaN         NaN        NaN        NaN        NaN        NaN              NaN        NaN        NaN
+14                            분류         판매         NaN     정액권 차감        NaN      티켓 차감        NaN  합계\n(A + B + C)      평균 단가     포인트 차감
+
+Column Types:
+(2025년 8월 15일 - 2025년 8월 31일)    object
+Unnamed: 1                       object
+Unnamed: 2                       object
+Unnamed: 3                       object
+Unnamed: 4                       object
+Unnamed: 5                       object
+Unnamed: 6                       object
+Unnamed: 7                       object
+Unnamed: 8                       object
+Unnamed: 9                       object
+
