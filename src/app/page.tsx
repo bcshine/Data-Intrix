@@ -181,17 +181,39 @@ export default function Home() {
   const derived = useMemo(()=>{
     if(!result?.wideData?.length) return null;
     const data = result.wideData;
-    const cats = Object.keys(data[0]).filter(k=>k.startsWith('Amt_'));
-    const catTotals = cats.map(k=>({name:k.replace('Amt_',''),value:data.reduce((s:number,r:any)=>s+(r[k]||0),0)})).sort((a:any,b:any)=>b.value-a.value);
-    const monthlyTotal = data.map((r:any)=>({period:r.Period_Start,total:cats.reduce((s:number,k:string)=>s+(r[k]||0),0)}));
-    const growthRate = monthlyTotal.map((r:any,i:number)=>({period:r.period,growth:i===0?0:Number((((r.total-monthlyTotal[i-1].total)/monthlyTotal[i-1].total)*100).toFixed(1))}));
-    const regSimple:any[] = result.statsData?.regression_simple||[];
-    const corrMatrix = result.statsData?.correlation_matrix||{};
-    const cvStats = result.statsData?.cv_stats||[];
-    const trend = result.statsData?.trend_analysis||{};
+    const stats = result.statsData || {};
+    
+    const menuCats = stats.menuCategories || [];
+    const catTotals = menuCats.map((k: string)=>({
+      name: k,
+      value: data.reduce((s:number,r:any)=>s+(r[k]||0),0)
+    })).sort((a:any,b:any)=>b.value-a.value);
+    
+    const monthlyTotal = data.map((r:any)=>({
+      period: r.Period_Start,
+      total: r.Total_Sales || 0
+    }));
+    
+    const growthRate = monthlyTotal.map((r:any,i:number)=>({
+      period: r.period,
+      growth: i===0?0:Number((((r.total-monthlyTotal[i-1].total)/monthlyTotal[i-1].total)*100).toFixed(1))
+    }));
+    
+    const regSimple = stats.regression_simple || [];
+    const externalReg = stats.external_regression || [];
+    const corrMatrix = stats.correlation_matrix || {};
+    const cvStats = stats.cv_stats || [];
+    const externalCvStats = stats.external_cv_stats || [];
+    const trend = stats.trend_analysis || {};
     const totalSales = monthlyTotal.reduce((s:number,r:any)=>s+r.total,0);
-    const avgMonthly = totalSales/monthlyTotal.length;
-    return {catTotals,monthlyTotal,growthRate,regSimple,corrMatrix,cvStats,trend,totalSales,avgMonthly};
+    const avgMonthly = totalSales / (monthlyTotal.length || 1);
+
+    return {
+      catTotals, monthlyTotal, growthRate, 
+      regSimple, externalReg, corrMatrix, 
+      cvStats, externalCvStats, 
+      trend, totalSales, avgMonthly
+    };
   },[result]);
 
   /* ── 업로드 화면 ── */
@@ -323,8 +345,9 @@ export default function Home() {
               ].map((item,i)=>(
                 <div key={i} style={{textAlign:'center',padding:'0.8rem',background:'#fff',borderRadius:4,border:`1px solid ${C.border}`}}>
                   <div style={{fontSize:'0.78rem',color:C.sub,marginBottom:'0.3rem'}}>{item.label}</div>
-                  <div style={{fontSize:'1.3rem',fontWeight:900,color:C.navy}}>{item.value}</div>
+                  <div style={{fontSize:'1.15rem',fontWeight:900,color:C.navy}}>{item.value}</div>
                 </div>
+
               ))}
             </div>
           </div>
@@ -365,10 +388,11 @@ export default function Home() {
 
           <Divider/>
 
-          {/* 2. 메뉴별 매출 */}
-          <SecTitle n="Ⅱ" t="메뉴별 매출 분석"/>
+          {/* 2. 제품별 매출 */}
+          <SecTitle n="Ⅱ" t="제품별 매출 분석"/>
           <div style={{display:'flex',gap:'1rem',flexWrap:'wrap'}}>
-            <Box title="메뉴별 누적 매출 (단위: 만원)" half={true}>
+            <Box title="제품별 누적 매출 (단위: 만원)" half={true}>
+
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={derived.catTotals.slice(0,8)} layout="vertical" margin={{left:10,right:10}}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false}/>
@@ -380,10 +404,11 @@ export default function Home() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <Caption text={result.strategyData?.chart_explanations?.menu_analysis || '메뉴별 누적 매출 비중을 나타냅니다.'}/>
+              <Caption text={result.strategyData?.chart_explanations?.menu_analysis || '제품별 누적 매출 비중을 나타냅니다.'}/>
             </Box>
 
-            <Box title="메뉴별 매출 비중 (파이차트)" half={true}>
+            <Box title="제품별 매출 비중 (파이차트)" half={true}>
+
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie data={derived.catTotals.slice(0,6)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
@@ -401,13 +426,14 @@ export default function Home() {
 
           {/* 변동계수 표 */}
           {derived.cvStats.length>0&&(
-            <Box title="메뉴별 매출 안정성 분석 (변동계수 CV%)">
+            <Box title="제품별 매출 안정성 분석 (변동계수 CV%)">
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.85rem'}}>
                 <thead>
                   <tr style={{background:C.navy,color:'#fff'}}>
-                    {['메뉴','평균 매출','표준편차','변동계수(CV%)','안정성 판정'].map(h=><th key={h} style={{padding:'0.5rem 0.8rem',textAlign:'left',fontWeight:700}}>{h}</th>)}
+                    {['제품명','평균 매출','표준편차','변동계수(CV%)','안정성 판정'].map(h=><th key={h} style={{padding:'0.5rem 0.8rem',textAlign:'left',fontWeight:700}}>{h}</th>)}
                   </tr>
                 </thead>
+
                 <tbody>
                   {derived.cvStats.slice(0,7).map((s:any,i:number)=>{
                     const unstable=s.변동계수_CV_perc>50;
@@ -425,7 +451,7 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
-              <Caption text={result.strategyData?.chart_explanations?.stability_analysis || '변동계수(CV%)가 50% 이상인 메뉴는 매출 기복이 심하여 안정적 수익 확보에 주의가 필요합니다.'}/>
+              <Caption text={result.strategyData?.chart_explanations?.stability_analysis || '변동계수(CV%)가 50% 이상인 제품은 매출 기복이 심하여 안정적 수익 확보에 주의가 필요합니다.'}/>
             </Box>
 
           )}
@@ -434,14 +460,15 @@ export default function Home() {
 
           {/* 3. 회귀분석 */}
           {derived.regSimple.length>0&&(<>
-            <SecTitle n="Ⅲ" t="회귀분석 결과"/>
-            <Box title="메뉴변수 단순회귀분석 결과 (독립변수 → 총매출)">
+            <SecTitle n="Ⅲ" t="통계적 매출 동인 분석"/>
+            <Box title="주요 제품별 단순회귀분석 결과 (독립변수 → 총매출)">
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.85rem'}}>
                 <thead>
                   <tr style={{background:C.navy,color:'#fff'}}>
-                    {['메뉴 변수','회귀계수(β)','R² (설명력)','P-value','유의성'].map(h=><th key={h} style={{padding:'0.5rem 0.8rem',textAlign:'left',fontWeight:700}}>{h}</th>)}
+                    {['제품 변수','회귀계수(β)','R² (설명력)','P-value','유의성'].map(h=><th key={h} style={{padding:'0.5rem 0.8rem',textAlign:'left',fontWeight:700}}>{h}</th>)}
                   </tr>
                 </thead>
+
                 <tbody>
                   {derived.regSimple.map((r:any,i:number)=>{
                     const sig=r.P_value<0.05;
@@ -457,14 +484,15 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
-              <Caption text={result.strategyData?.chart_explanations?.regression_analysis || 'R²(결정계수)는 해당 메뉴 매출이 총매출 변동을 얼마나 설명하는지를 나타냅니다. P<0.05인 항목이 통계적으로 유의미한 핵심 매출 동인입니다.'}/>
+              <Caption text={result.strategyData?.chart_explanations?.regression_analysis || 'R²(결정계수)는 해당 제품 매출이 총매출 변동을 얼마나 설명하는지를 나타냅니다. P<0.05인 항목이 통계적으로 유의미한 핵심 매출 동인입니다.'}/>
             </Box>
 
           </>)}
 
           {/* 상관관계 매트릭스 */}
           {Object.keys(derived.corrMatrix).length>0&&(
-            <Box title="메뉴 간 상관관계 매트릭스 (Pearson r)">
+            <Box title="제품 간 상관관계 매트릭스 (Pearson r)">
+
               <div style={{overflowX:'auto'}}>
                 <table style={{borderCollapse:'collapse',fontSize:'0.8rem',margin:'0 auto'}}>
                   <thead>
@@ -490,14 +518,47 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
-              <Caption text="초록(r>0.7): 강한 동반성장 관계. 빨강(r<-0.3): 대체재 관계(카니발리제이션 주의). 두 메뉴를 동시에 프로모션 시 효과 반감 가능성이 있습니다."/>
+              <Caption text="초록(r>0.7): 강한 동반성장 관계. 빨강(r<-0.3): 대체재 관계. 두 제품을 동시에 프로모션 시 효과 반감 가능성이 있습니다."/>
             </Box>
           )}
 
           <Divider/>
 
-          {/* 4. AI 전략적 제언 */}
-          <SecTitle n="Ⅳ" t="전략적 제언 및 Action Plan"/>
+          {/* 4. 마케팅 및 외부 요인 분석 */}
+          {derived.externalCvStats?.length > 0 && (
+            <>
+              <SecTitle n="Ⅳ" t="마케팅 및 외부 요인 분석"/>
+              <Box title="외부 변수 영향력 분석 (기온, 행사, 주말 등)">
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.85rem', marginBottom:'1.5rem'}}>
+                  <thead>
+                    <tr style={{background:C.blue,color:'#fff'}}>
+                      {['외부 요인','영향도(R²)','회귀계수(β)','상태'].map(h=><th key={h} style={{padding:'0.5rem 0.8rem',textAlign:'left',fontWeight:700}}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(derived.externalReg || []).map((r:any,i:number)=>{
+                      const sig=r.P_value<0.05;
+                      return(
+                        <tr key={i} style={{borderBottom:`1px solid ${C.border}`,background:i%2?C.bg:'#fff'}}>
+                          <td style={{padding:'0.5rem 0.8rem',fontWeight:600}}>{r.제품변수}</td>
+                          <td style={{padding:'0.5rem 0.8rem',fontWeight:700}}>{(r.R_squared*100).toFixed(1)}%</td>
+                          <td style={{padding:'0.5rem 0.8rem'}}>{r.회귀계수?.toFixed(3)??'-'}</td>
+                          <td style={{padding:'0.5rem 0.8rem'}}><span style={{color:sig?'#059669':'#94a3b8',fontWeight:700,fontSize:'0.8rem'}}>{sig?'매우 중요':'보통'}</span></td>
+                        </tr>
+                      );
+                    })}
+
+                  </tbody>
+                </table>
+                <Caption text={result.strategyData?.chart_explanations?.external_factor_analysis || '외부 요인이 매출에 미치는 영향입니다.'}/>
+              </Box>
+              <Divider/>
+            </>
+          )}
+
+          {/* 5. AI 전략적 제언 */}
+          <SecTitle n="Ⅴ" t="전략적 제언 및 Action Plan"/>
+
 
           {/* 4-0. 주요 발견사항 & 개선 방향 요약 카드 */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1rem',marginBottom:'1.5rem'}}>

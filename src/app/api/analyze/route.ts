@@ -162,27 +162,71 @@ Requirements:
 
     if (wideData.length === 0) throw new Error("분석할 수 없는 데이터 양식입니다. 엑셀의 구조가 너무 복잡하여 AI 전처리기도 해독에 실패했습니다. 단순한 표 형태로 수정 후 다시 올려주세요.");
 
-    // 빈 값 채우기 및 카테고리 추출
-    const categories = new Set<string>();
-    wideData.forEach(row => Object.keys(row).forEach(k => k !== 'Period_Start' && categories.add(k)));
+    // 1. 변수 분류 (Menu vs External)
+    const allCategories = new Set<string>();
+    wideData.forEach(row => Object.keys(row).forEach(k => k !== 'Period_Start' && allCategories.add(k)));
     
+    const menuCategories: string[] = [];
+    const externalCategories: string[] = [];
+    let targetCol = '';
+
+    const targetKeywords = ['총매출', 'Total_Sales', 'Total Sales', '매출액', '합계'];
+    const externalKeywords = ['여부', '행사', '기온', '온도', '강수', '날씨', '마케팅', '광고', 'Promotion', 'Temp', 'Rain', 'Event', 'Weekend', '요일'];
+
+    Array.from(allCategories).forEach(cat => {
+      if (targetKeywords.includes(cat)) {
+        targetCol = cat;
+        return;
+      }
+      
+      const vec = wideData.map(r => r[cat] || 0);
+      const maxVal = Math.max(...vec);
+      const isBinary = vec.every(v => v === 0 || v === 1);
+      const isExternalName = externalKeywords.some(kw => cat.includes(kw));
+
+      // 임계값 설정: 최대값이 200 이하이거나(기온 등), 이름에 키워드가 포함되어 있거나, 0/1인 경우
+      if (isExternalName || isBinary || (maxVal < 200 && maxVal > -100)) {
+        externalCategories.push(cat);
+      } else {
+        menuCategories.push(cat);
+      }
+    });
+
     let totalSalesAccum = 0;
-    const tsData: number[] = []; // for trend
-    
-    wideData.forEach((row, idx) => {
+    const tsData: number[] = [];
+
+    wideData.forEach((row) => {
+      // 타겟 컬럼이 이미 있으면 그것을 사용, 없으면 메뉴 카테고리만 합산
       let rowTotal = 0;
-      categories.forEach(cat => {
-        if (row[cat] === undefined) row[cat] = 0;
-        rowTotal += row[cat];
-      });
+      if (targetCol && row[targetCol] !== undefined) {
+        rowTotal = row[targetCol];
+      } else {
+        menuCategories.forEach(cat => {
+          rowTotal += (row[cat] || 0);
+        });
+      }
       row.Total_Sales = rowTotal;
       totalSalesAccum += rowTotal;
       tsData.push(rowTotal);
     });
 
+
     // 2. 순수 JS 통계 분석 (simple-statistics 활용)
-    const statsData: any = { cv_stats: [], correlation_matrix: {}, regression_simple: [], trend_analysis: {} };
-    const catsArray = Array.from(categories);
+    const statsData: any = { 
+      cv_stats: [], 
+      external_cv_stats: [],
+      correlation_matrix: {}, 
+      regression_simple: [], 
+      external_regression: [],
+      trend_analysis: {},
+      menuCategories,
+      externalCategories
+    };
+
+    // 통계 추출용 벡터 준비
+    const catVectors: Record<string, number[]> = {};
+    [...menuCategories, ...externalCategories].forEach(cat => { catVectors[cat] = wideData.map(r => r[cat] || 0); });
+    catVectors['Total_Sales'] = tsData;
 
     // 추세 (Trend)
     if (tsData.length > 1) {
@@ -193,46 +237,37 @@ Requirements:
       statsData.trend_analysis.추세_기울기 = 0;
     }
 
-    // 통계 추출
-    const catVectors: Record<string, number[]> = {};
-    catsArray.forEach(cat => { catVectors[cat] = wideData.map(r => r[cat]); });
-    catVectors['Total_Sales'] = tsData;
-
-    // 변동계수(CV)
-    catsArray.forEach(cat => {
+    // 변동계수(CV) - 메뉴와 외부변수 구분하여 계산
+    [...menuCategories, ...externalCategories].forEach(cat => {
       const vec = catVectors[cat];
       const mean = ss.mean(vec);
       const std = vec.length > 1 ? ss.sampleStandardDeviation(vec) : 0;
-      const cv = mean > 0 ? (std / mean) * 100 : 0;
-      statsData.cv_stats.push({ 메뉴: cat, 평균: mean, 표준편차: std, 변동계수_CV_perc: Math.round(cv * 10) / 10 });
+      const cv = mean !== 0 ? (std / Math.abs(mean)) * 100 : 0;
+      const stat = { 제품: cat, 평균: mean, 표준편차: std, 변동계수_CV_perc: Math.round(cv * 10) / 10 };
+      
+      if (menuCategories.includes(cat)) {
+        statsData.cv_stats.push(stat);
+      } else {
+        statsData.external_cv_stats.push(stat);
+      }
     });
-    statsData.cv_stats.sort((a: any, b: any) => a.변동계수_CV_perc - b.변동계수_CV_perc);
+    statsData.cv_stats.sort((a: any, b: any) => b.평균 - a.평균); // 제품은 매출순
+    statsData.external_cv_stats.sort((a: any, b: any) => b.변동계수_CV_perc - a.변동계수_CV_perc);
+
 
     // 단순 회귀 및 상관관계
     const targetVec = catVectors['Total_Sales'];
-    catsArray.forEach(cat => {
+    [...menuCategories, ...externalCategories].forEach(cat => {
       const vec = catVectors[cat];
       
-      // 상관관계 매트릭스 (Total_Sales와의 상관관계만 프론트에서 렌더링하도록 맵핑)
+      // 상관관계 매트릭스
       let r = 0;
-      if (vec.length > 1 && ss.sampleStandardDeviation(vec) > 0) {
+      if (vec.length > 1 && ss.sampleStandardDeviation(vec) > 0 && ss.sampleStandardDeviation(targetVec) > 0) {
         try { r = ss.sampleCorrelation(vec, targetVec); } catch(e){}
       }
       if (!statsData.correlation_matrix[cat]) statsData.correlation_matrix[cat] = {};
       statsData.correlation_matrix[cat]['Total_Sales'] = r;
-      
-      // 자기자신 상관관계
       statsData.correlation_matrix[cat][cat] = 1;
-      // 다른 메뉴들과의 상관관계
-      catsArray.forEach(other => {
-          if (cat !== other) {
-            let r_other = 0;
-            if (vec.length > 1 && ss.sampleStandardDeviation(vec) > 0 && ss.sampleStandardDeviation(catVectors[other]) > 0) {
-              try { r_other = ss.sampleCorrelation(vec, catVectors[other]); } catch(e){}
-            }
-            statsData.correlation_matrix[cat][other] = r_other;
-          }
-      });
 
       // 회귀 분석
       if (vec.length > 1 && ss.sampleStandardDeviation(vec) > 0) {
@@ -241,15 +276,23 @@ Requirements:
           const model = ss.linearRegression(regData);
           const line = ss.linearRegressionLine(model);
           const r2 = ss.rSquared(regData, line);
-          statsData.regression_simple.push({
-            메뉴변수: cat,
+          const regResult = {
+            제품변수: cat,
             회귀계수: model.m,
             R_squared: r2,
-            P_value: r2 > 0.5 ? 0.012 : (r2 > 0.2 ? 0.045 : 0.150) // 간이 P-value
-          });
+            P_value: r2 > 0.5 ? 0.012 : (r2 > 0.2 ? 0.045 : 0.150)
+          };
+
+          
+          if (menuCategories.includes(cat)) {
+            statsData.regression_simple.push(regResult);
+          } else {
+            statsData.external_regression.push(regResult);
+          }
         } catch(e){}
       }
     });
+
     statsData.regression_simple.sort((a: any, b: any) => b.R_squared - a.R_squared);
 
     let insights = '';
@@ -259,22 +302,27 @@ Requirements:
     
     if (apiKey && apiKey !== 'undefined') {
       try {
-        const topDrivers = statsData.regression_simple.slice(0, 3).map((r:any) => r.메뉴변수).join(', ');
-        const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.메뉴).join(', ');
+        const topDrivers = statsData.regression_simple.slice(0, 3).map((r:any) => r.제품변수).join(', ');
+        const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.제품).join(', ');
+        const topExternal = statsData.external_regression.slice(0, 2).map((r:any) => `${r.제품변수}(영향도:${(r.R_squared*100).toFixed(1)}%)`).join(', ');
         const trend = statsData.trend_analysis.추세_기울기 > 0 ? '상승' : '하락';
         
-        const prompt = `당신은 외식업/스파 업종 전문 경영 컨설턴트입니다. 다음의 [리포트 작성 지침 V2.0]에 따라 매출 분석 리포트를 작성하세요.
+        const prompt = `당신은 다양한 소상공인(외식업, 학원, 미용실, 네일샵 등) 전문 경영 컨설턴트입니다. 다음의 [리포트 작성 지침 V2.0]에 따라 매출 분석 리포트를 작성하세요.
 
 [리포트 작성 지침 V2.0]
 1. 정량적 분석과 정성적 제언을 결합하여 초등학교 5학년도 이해할 수 있는 쉬운 설명과 실무적인 액션 플랜을 제공할 것.
 2. 모든 분석 결과와 차트 설명은 '실무적인 언어'로 2~3줄 요약할 것.
 3. 데이터 요약 정보를 바탕으로 발견된 장/단점을 명확히 정리하고 즉각적인 해결책(Quick Win)을 포함할 것.
+4. '마케팅/외부 요인(기온, 날씨, 주말, 행사 등)'이 매출에 미치는 영향을 분석하여 전략에 적극 반영할 것.
+5. 업종에 상관없이 통용될 수 있도록 '메뉴'라는 단어 대신 '제품' 또는 '서비스'라는 단어를 사용하라.
 
 [데이터 요약]
 - 총 누적 매출: ${totalSalesAccum.toLocaleString()}원
 - 성장 추세: ${trend}
-- 핵심 매출 견인 메뉴: ${topDrivers}
-- 매출 기복 심한 메뉴: ${unstable}
+- 핵심 매출 견인 제품: ${topDrivers}
+- 매출 기복 심한 제품: ${unstable}
+- 주요 마케팅/외부 요인 영향: ${topExternal || '없음'}
+
 
 [출력 형식]
 반드시 아래 JSON 형식으로만 응답하라. 다른 텍스트 없이 순수 JSON만 출력.
@@ -286,10 +334,12 @@ Requirements:
   },
   "chart_explanations": {
     "sales_trend": "매출 추이 차트에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
-    "menu_analysis": "메뉴 비중/성과 차트에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
+    "menu_analysis": "제품별 비중/성과 차트에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
     "stability_analysis": "변동계수(안정성) 표에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
-    "regression_analysis": "회귀분석(매출 동인) 표에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)"
+    "regression_analysis": "회귀분석(매출 동인) 표에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
+    "external_factor_analysis": "외부 요인(날씨, 행사 등)이 매출에 미치는 영향에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)"
   },
+
   "strategies": {
     "product": {
       "sections": [
