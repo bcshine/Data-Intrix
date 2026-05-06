@@ -145,13 +145,12 @@ export async function POST(req: NextRequest) {
     });
     statsData.regression_simple.sort((a: any, b: any) => b.R_squared - a.R_squared);
 
-    // 3. AI 인사이트 생성 (Gemini API 직접 호출)
     let insights = '';
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
     if (apiKey) {
       try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const genAI = new GoogleGenerativeAI(apiKey.trim().replace(/['"]/g, ''));
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
         const topDrivers = statsData.regression_simple.slice(0, 3).map((r:any) => r.메뉴변수).join(', ');
         const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.메뉴).join(', ');
