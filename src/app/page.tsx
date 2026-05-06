@@ -214,7 +214,7 @@ export default function Home() {
                 <Bar dataKey="total" fill={C.navy} radius={[2,2,0,0]} maxBarSize={60}/>
               </BarChart>
             </ResponsiveContainer>
-            <Caption text={result.monthlyCaption||'월별 총매출 추이입니다. 계절성 및 성장 패턴을 확인하세요.'}/>
+            <Caption text={'월별 총매출 추이입니다. 계절성 및 성장 패턴을 확인하세요.'}/>
           </Box>
 
           <Box title="전월 대비 매출 성장률 (%)">
@@ -248,7 +248,7 @@ export default function Home() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <Caption text={result.categoryCaption||'메뉴별 누적 매출 비중을 나타냅니다.'}/>
+              <Caption text={'메뉴별 누적 매출 비중을 나타냅니다.'}/>
             </Box>
             <Box title="메뉴별 매출 비중 (파이차트)" half={true}>
               <ResponsiveContainer width="100%" height={240}>
