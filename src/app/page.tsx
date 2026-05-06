@@ -270,7 +270,7 @@ export default function Home() {
       }
 
       // 페이지 번호 및 푸터 추가
-      const totalPages = pdf.internal.getNumberOfPages();
+      const totalPages = (pdf as any).getNumberOfPages();
       for (let j = 1; j <= totalPages; j++) {
         pdf.setPage(j);
         pdf.setFontSize(9);
