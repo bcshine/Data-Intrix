@@ -33,35 +33,61 @@ export async function POST(req: NextRequest) {
     const workbook = xlsx.read(arrayBuffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    // 1. 데이터 파싱 (다양한 포맷 지원)
+    // 1. 범용 데이터 파싱 (일반적인 표 형태의 데이터 자동 파싱 및 월별(YYYY-MM) 자동 병합)
     let wideData: any[] = [];
     const jsonObjects = xlsx.utils.sheet_to_json(worksheet) as Record<string, any>[];
+    
+    if (jsonObjects.length > 0) {
+      const firstRow = jsonObjects[0];
+      // 일자/날짜/Date 성격을 띄는 컬럼을 자동으로 찾고, 없으면 첫 번째 컬럼을 날짜 컬럼으로 간주
+      let dateKey = Object.keys(firstRow).find(k => /날짜|일자|date|period|기간|일시/i.test(k)) || Object.keys(firstRow)[0];
+      
+      const monthlyAgg: Record<string, any> = {};
+      let validRowsCount = 0;
 
-    if (jsonObjects.length > 0 && jsonObjects[0].Period_Start !== undefined) {
-      // 포맷 A: 파이썬 등에서 이미 전처리된 'regression_ready_data' 스타일
-      wideData = jsonObjects.map(row => {
-        let pStart = String(row.Period_Start).trim();
-        // 엑셀 날짜 일련번호인 경우 변환
-        if (typeof row.Period_Start === 'number') {
-          const d = new Date((row.Period_Start - 25569) * 86400 * 1000);
+      for (const row of jsonObjects) {
+        let rawDate = row[dateKey];
+        if (rawDate === undefined || rawDate === null) continue;
+        
+        let pStart = String(rawDate).trim();
+        
+        // 엑셀 자체 날짜 포맷(일련번호)인 경우 변환
+        if (typeof rawDate === 'number') {
+          const d = new Date((rawDate - 25569) * 86400 * 1000);
           pStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         } else {
-          const m = pStart.match(/^(\d{4})[-/.]?(\d{1,2})/);
-          if (m) pStart = `${m[1]}-${m[2].padStart(2, '0')}`;
+          // 2025.4.24, 2025-04-24, 2025/4/24 형태에서 연-월 추출
+          const m = pStart.match(/^(\d{4})[-/.]\s*(\d{1,2})/);
+          if (m) {
+            pStart = `${m[1]}-${m[2].padStart(2, '0')}`;
+          } else {
+            // 날짜 형식이 아니면 건너뜀
+            continue;
+          }
         }
+        
+        if (!monthlyAgg[pStart]) monthlyAgg[pStart] = { Period_Start: pStart };
+        validRowsCount++;
 
-        const newRow: any = { Period_Start: pStart };
+        // 나머지 모든 컬럼(메뉴)의 매출액을 해당 월에 누적 합산 (총매출, 비고 컬럼 등은 분석에서 제외)
         for (const key of Object.keys(row)) {
-          if (key === 'Period_Start' || key === 'Period_End') continue;
+          if (key === dateKey || /총매출|총 매출|합계|total|비고|Period_End/i.test(key)) continue;
+          
           let catName = key;
-          // 파이썬 전처리본에서 붙은 'Amt_' 접두사 제거
           if (catName.startsWith('Amt_')) catName = catName.replace('Amt_', '').replace(/_/g, ' ');
-          newRow[catName] = cleanNumeric(row[key]);
+          
+          const val = cleanNumeric(row[key]);
+          monthlyAgg[pStart][catName] = (monthlyAgg[pStart][catName] || 0) + val;
         }
-        return newRow;
-      });
-    } else {
-      // 포맷 B: 기존 POS 원본 데이터 스타일
+      }
+      
+      if (validRowsCount > 0) {
+        wideData = Object.values(monthlyAgg).sort((a: any, b: any) => a.Period_Start.localeCompare(b.Period_Start));
+      }
+    }
+
+    // 2. 만약 일반적인 표 형태로 파싱하지 못했다면, 아주 특수한 형태(기존 SPA 원본 포스기 데이터) 파싱 시도
+    if (wideData.length === 0) {
       const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
       const wideDataMap: Record<string, any> = {};
       let currentStart = '';
@@ -82,7 +108,7 @@ export async function POST(req: NextRequest) {
       wideData = Object.values(wideDataMap).sort((a, b) => a.Period_Start.localeCompare(b.Period_Start));
     }
 
-    if (wideData.length === 0) throw new Error("분석할 데이터가 없습니다. 파일 양식을 확인해주세요.");
+    if (wideData.length === 0) throw new Error("분석할 수 없는 데이터 양식입니다. 날짜(YYYY-MM-DD 등)와 카테고리별 매출이 포함된 엑셀 파일을 올려주세요.");
 
     // 빈 값 채우기 및 카테고리 추출
     const categories = new Set<string>();
