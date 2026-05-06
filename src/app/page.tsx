@@ -110,14 +110,15 @@ function Insights({ text }: { text:string }) {
   );
 }
 
-// ── 전략 탭 정의
-const STRATEGY_TABS = [
+// ── 전략 섹션 정의
+const STRATEGY_SECTIONS = [
   { key: 'product',     icon: '🍽️', label: '제품 전략' },
   { key: 'customer',   icon: '👥', label: '고객관리 전략' },
   { key: 'event',      icon: '🎉', label: '이벤트 전략' },
   { key: 'price',      icon: '💰', label: '가격 전략' },
   { key: 'operation',  icon: '🏢', label: '조직관리 전략' },
 ];
+
 
 // ── 전략 컨텐츠 렌더러
 function StrategyCard({ icon, title, items }: { icon: string; title: string; items: string[] }) {
@@ -165,7 +166,6 @@ export default function Home() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [dragging, setDragging] = useState(false);
-  const [strategyTab, setStrategyTab] = useState('product');
 
   const processFile = async (file: File) => {
     setFileName(file.name); setUploading(true); setError('');
@@ -269,6 +269,21 @@ export default function Home() {
         currentY += elHeightMm + 4; // 요소 간 4mm 간격
       }
 
+      // 페이지 번호 및 푸터 추가
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let j = 1; j <= totalPages; j++) {
+        pdf.setPage(j);
+        pdf.setFontSize(9);
+        pdf.setTextColor(100);
+        // 중앙 하단: - 1 / 3 -
+        pdf.text(`- ${j} / ${totalPages} -`, pdfWidth / 2, pdfHeight - 8, { align: 'center' });
+        
+        // 우측 하단: 분석 기관 (작게)
+        pdf.setFontSize(7);
+        pdf.setTextColor(150);
+        pdf.text('중간계 인트릭스 연구소', pdfWidth - margin, pdfHeight - 8, { align: 'right' });
+      }
+
       pdf.save(`${fileName.replace(/\.[^/.]+$/, '')}_AI_전략리포트.pdf`);
       
       // 버튼 복구
@@ -330,8 +345,9 @@ export default function Home() {
                 <Bar dataKey="total" fill={C.navy} radius={[2,2,0,0]} maxBarSize={60}/>
               </BarChart>
             </ResponsiveContainer>
-            <Caption text={'월별 총매출 추이입니다. 계절성 및 성장 패턴을 확인하세요.'}/>
+            <Caption text={result.strategyData?.chart_explanations?.sales_trend || '월별 총매출 추이입니다. 계절성 및 성장 패턴을 확인하세요.'}/>
           </Box>
+
 
           <Box title="전월 대비 매출 성장률 (%)">
             <ResponsiveContainer width="100%" height={180}>
@@ -364,8 +380,9 @@ export default function Home() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <Caption text={'메뉴별 누적 매출 비중을 나타냅니다.'}/>
+              <Caption text={result.strategyData?.chart_explanations?.menu_analysis || '메뉴별 누적 매출 비중을 나타냅니다.'}/>
             </Box>
+
             <Box title="메뉴별 매출 비중 (파이차트)" half={true}>
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
@@ -377,8 +394,9 @@ export default function Home() {
                   <Tooltip formatter={(v:any)=>[Number(v).toLocaleString()+'원']}/>
                 </PieChart>
               </ResponsiveContainer>
-              <Caption text="전체 매출에서 각 메뉴가 차지하는 비중입니다."/>
+              <Caption text={result.strategyData?.chart_explanations?.menu_analysis || '전체 매출에서 각 메뉴가 차지하는 비중입니다.'}/>
             </Box>
+
           </div>
 
           {/* 변동계수 표 */}
@@ -407,8 +425,9 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
-              <Caption text="변동계수(CV%)가 50% 이상인 메뉴는 매출 기복이 심하여 안정적 수익 확보에 주의가 필요합니다."/>
+              <Caption text={result.strategyData?.chart_explanations?.stability_analysis || '변동계수(CV%)가 50% 이상인 메뉴는 매출 기복이 심하여 안정적 수익 확보에 주의가 필요합니다.'}/>
             </Box>
+
           )}
 
           <Divider/>
@@ -438,8 +457,9 @@ export default function Home() {
                   })}
                 </tbody>
               </table>
-              <Caption text="R²(결정계수)는 해당 메뉴 매출이 총매출 변동을 얼마나 설명하는지를 나타냅니다. P<0.05인 항목이 통계적으로 유의미한 핵심 매출 동인입니다."/>
+              <Caption text={result.strategyData?.chart_explanations?.regression_analysis || 'R²(결정계수)는 해당 메뉴 매출이 총매출 변동을 얼마나 설명하는지를 나타냅니다. P<0.05인 항목이 통계적으로 유의미한 핵심 매출 동인입니다.'}/>
             </Box>
+
           </>)}
 
           {/* 상관관계 매트릭스 */}
@@ -485,8 +505,9 @@ export default function Home() {
             <div style={{border:`2px solid #d97706`,borderRadius:6,padding:'1.4rem 1.6rem',background:'#fffbeb',position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',top:0,left:0,right:0,height:4,background:'#d97706'}}/>
               <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
-                <span style={{background:'#d97706',color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.85rem',fontWeight:900}}>주요발견사항</span>
+                <span style={{background:'#d97706',color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.9rem',fontWeight:900}}>주요 발견사항 (Findings)</span>
               </div>
+
               {result.strategyData?.summary?.findings?.length > 0 ? (
                 <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
                   {result.strategyData.summary.findings.map((f: string, i: number) => (
@@ -504,8 +525,9 @@ export default function Home() {
             <div style={{border:`2px solid ${C.blue}`,borderRadius:6,padding:'1.4rem 1.6rem',background:C.light,position:'relative',overflow:'hidden'}}>
               <div style={{position:'absolute',top:0,left:0,right:0,height:4,background:C.blue}}/>
               <div style={{display:'flex',alignItems:'center',gap:'0.6rem',marginBottom:'1rem'}}>
-                <span style={{background:C.blue,color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.85rem',fontWeight:900}}>개선 방향</span>
+                <span style={{background:C.blue,color:'#fff',padding:'0.25rem 0.8rem',borderRadius:3,fontSize:'0.9rem',fontWeight:900}}>개선 방향 (Improvements)</span>
               </div>
+
               {result.strategyData?.summary?.improvements?.length > 0 ? (
                 <ul style={{margin:0,padding:0,listStyle:'none',display:'flex',flexDirection:'column',gap:'0.5rem'}}>
                   {result.strategyData.summary.improvements.map((f: string, i: number) => (
@@ -521,46 +543,24 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 4-1. 5대 전략 탭 */}
-          <div style={{border:`2px solid ${C.navy}`,borderRadius:6,overflow:'hidden'}}>
-            {/* 탭 헤더 */}
-            <div style={{display:'flex',background:C.navy}}>
-              {STRATEGY_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setStrategyTab(tab.key)}
-                  style={{
-                    flex:1, border:'none', background:'transparent', cursor:'pointer',
-                    padding:'0.85rem 0.4rem',
-                    color: strategyTab === tab.key ? '#fff' : 'rgba(255,255,255,0.55)',
-                    fontWeight: strategyTab === tab.key ? 900 : 600,
-                    fontSize:'0.8rem',
-                    borderBottom: strategyTab === tab.key ? `3px solid ${C.blue}` : '3px solid transparent',
-                    transition:'all 0.15s',
-                    display:'flex',flexDirection:'column',alignItems:'center',gap:'0.25rem',
-                    fontFamily:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif"
-                  }}
-                >
-                  <span style={{fontSize:'1.3rem'}}>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-            {/* 탭 바디 */}
-            <div style={{padding:'1.6rem',background:'#f8fafc',minHeight:280}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.2rem'}}>
+          {/* 4-1. 5대 전략 상세 (세로 나열) */}
+          {STRATEGY_SECTIONS.map(section => (
+            <div key={section.key} className="pdf-keep-next" style={{border:`2px solid ${C.navy}`,borderRadius:6,marginBottom:'1.5rem',overflow:'hidden', pageBreakInside: 'avoid', background: '#fff'}}>
+              {/* 섹션 헤더 */}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:C.navy,padding:'1rem 1.6rem'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'0.7rem'}}>
-                  <span style={{fontSize:'1.5rem'}}>{STRATEGY_TABS.find(t=>t.key===strategyTab)?.icon}</span>
-                  <div>
-                    <div style={{fontSize:'1.1rem',fontWeight:900,color:C.navy}}>{STRATEGY_TABS.find(t=>t.key===strategyTab)?.label}</div>
-                    <div style={{fontSize:'0.78rem',color:C.sub}}>데이터 기반 AI 전략 제언 · 중간계 인트릭스 연구소</div>
-                  </div>
+                  <span style={{fontSize:'1.5rem'}}>{section.icon}</span>
+                  <div style={{fontSize:'1.15rem',fontWeight:900,color:'#fff'}}>{section.label}</div>
                 </div>
-                <div style={{width:44,height:44,borderRadius:'50%',border:`2px solid ${C.navy}`,display:'flex',alignItems:'center',justifyContent:'center',color:C.navy,fontWeight:900,fontSize:'0.65rem',transform:'rotate(-10deg)',flexShrink:0}}>승&nbsp;인</div>
+                <div style={{width:40,height:40,borderRadius:'50%',border:`2px solid rgba(255,255,255,0.8)`,display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.9)',fontWeight:900,fontSize:'0.65rem',transform:'rotate(-10deg)',flexShrink:0}}>승&nbsp;인</div>
               </div>
-              <StrategyTabPanel tabKey={strategyTab} strategyData={result.strategyData?.strategies} />
+              {/* 섹션 바디 */}
+              <div style={{padding:'1.6rem',background:'#f8fafc'}}>
+                <StrategyTabPanel tabKey={section.key} strategyData={result.strategyData?.strategies} />
+              </div>
             </div>
-          </div>
+          ))}
+
 
           {/* 리포트 하단 */}
           <div style={{marginTop:'3rem',borderTop:`1px solid ${C.border}`,paddingTop:'1rem',display:'flex',justifyContent:'space-between',fontSize:'0.78rem',color:'#94a3b8'}}>

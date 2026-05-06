@@ -263,7 +263,12 @@ Requirements:
         const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.메뉴).join(', ');
         const trend = statsData.trend_analysis.추세_기울기 > 0 ? '상승' : '하락';
         
-        const prompt = `당신은 외식업/스파 업종 전문 경영 컨설턴트입니다. 아래 매출 데이터를 바탕으로 5가지 전략 영역에 대한 구체적인 액션 플랜을 작성하세요.
+        const prompt = `당신은 외식업/스파 업종 전문 경영 컨설턴트입니다. 다음의 [리포트 작성 지침 V2.0]에 따라 매출 분석 리포트를 작성하세요.
+
+[리포트 작성 지침 V2.0]
+1. 정량적 분석과 정성적 제언을 결합하여 초등학교 5학년도 이해할 수 있는 쉬운 설명과 실무적인 액션 플랜을 제공할 것.
+2. 모든 분석 결과와 차트 설명은 '실무적인 언어'로 2~3줄 요약할 것.
+3. 데이터 요약 정보를 바탕으로 발견된 장/단점을 명확히 정리하고 즉각적인 해결책(Quick Win)을 포함할 것.
 
 [데이터 요약]
 - 총 누적 매출: ${totalSalesAccum.toLocaleString()}원
@@ -272,48 +277,54 @@ Requirements:
 - 매출 기복 심한 메뉴: ${unstable}
 
 [출력 형식]
-반드시 아래 JSON 형식으로만 응답하라. 다른 텍스트나 마크다운 코드블록(\'\'\'json 등) 없이 순수 JSON만 출력.
+반드시 아래 JSON 형식으로만 응답하라. 다른 텍스트 없이 순수 JSON만 출력.
 
 {
   "summary": {
-    "findings": ["발견사항1", "발견사항2", "발견사항3"],
-    "improvements": ["개선방향1", "개선방향2", "개선방향3"]
+    "findings": ["주요 발견사항1 (데이터 기반 팩트)", "주요 발견사항2", "주요 발견사항3"],
+    "improvements": ["개선 방향1 (가시성 높은 해결책)", "개선 방향2", "핵심 레슨(Lesson Learned) 및 Quick Win"]
+  },
+  "chart_explanations": {
+    "sales_trend": "매출 추이 차트에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
+    "menu_analysis": "메뉴 비중/성과 차트에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
+    "stability_analysis": "변동계수(안정성) 표에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)",
+    "regression_analysis": "회귀분석(매출 동인) 표에 대한 초5 수준의 쉬운 실무 설명 (2~3줄)"
   },
   "strategies": {
     "product": {
       "sections": [
-        { "icon": "🆕", "title": "신제품 전략", "items": ["항목명: 설명", "항목명: 설명"] },
-        { "icon": "🍱", "title": "세트메뉴 전략", "items": ["항목명: 설명", "항목명: 설명"] },
-        { "icon": "🌸", "title": "시즌메뉴 전략", "items": ["항목명: 설명", "항목명: 설명"] }
+        { "icon": "🆕", "title": "신제품 전략", "items": ["항목명: 구체적 실행 내용"] },
+        { "icon": "🍱", "title": "세트메뉴 전략", "items": ["항목명: 구체적 실행 내용"] },
+        { "icon": "🌸", "title": "시즌메뉴 전략", "items": ["항목명: 구체적 실행 내용"] }
       ]
     },
     "customer": {
       "sections": [
-        { "icon": "🔁", "title": "고정고객 관리", "items": ["항목명: 설명", "항목명: 설명"] },
-        { "icon": "✨", "title": "신규고객 유치", "items": ["항목명: 설명", "항목명: 설명"] }
+        { "icon": "🔁", "title": "고정고객 관리", "items": ["항목명: 구체적 실행 내용"] },
+        { "icon": "✨", "title": "신규고객 유치", "items": ["항목명: 구체적 실행 내용"] }
       ]
     },
     "event": {
       "sections": [
-        { "icon": "🗓️", "title": "시즌별 이벤트", "items": ["항목명: 설명", "항목명: 설명"] },
-        { "icon": "🎁", "title": "고객별 이벤트", "items": ["항목명: 설명", "항목명: 설명"] }
+        { "icon": "🗓️", "title": "시즌별 이벤트", "items": ["항목명: 구체적 실행 내용"] },
+        { "icon": "🎁", "title": "고객별 이벤트", "items": ["항목명: 구체적 실행 내용"] }
       ]
     },
     "price": {
       "sections": [
-        { "icon": "📊", "title": "경쟁사 대비 가격전략", "items": ["항목명: 설명", "항목명: 설명", "항목명: 설명"] }
+        { "icon": "📊", "title": "가격 최적화 전략", "items": ["항목명: 구체적 실행 내용"] }
       ]
     },
     "operation": {
       "sections": [
-        { "icon": "👤", "title": "내부직원 관리", "items": ["항목명: 설명", "항목명: 설명"] },
-        { "icon": "🏆", "title": "동기부여 전략", "items": ["항목명: 설명", "항목명: 설명"] }
+        { "icon": "👤", "title": "내부직원 관리", "items": ["항목명: 구체적 실행 내용"] },
+        { "icon": "🏆", "title": "동기부여 전략", "items": ["항목명: 구체적 실행 내용"] }
       ]
     }
   }
 }
 
-각 items 배열의 항목은 '항목명: 구체적 설명' 형태로, 실제 데이터에서 발견된 사실을 근거로 실행 가능한 액션 플랜을 3~4개씩 작성하라.`;
+각 전략의 items는 실제 데이터 수치와 경향을 반영하여 즉시 실행 가능한 수준으로 작성하라.`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
