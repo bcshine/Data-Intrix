@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
         insights = result.response.text();
       } catch (e: any) {
         console.error("AI Error:", e);
-        insights = "AI 인사이트를 생성하는 중 오류가 발생했습니다. (API 키 확인 필요)";
+        insights = `AI 인사이트 생성 오류: ${e.message || String(e)}\n\n(Vercel 서버에서 발생한 실제 에러입니다. 이 화면을 알려주시면 바로 해결해 드리겠습니다.)`;
       }
     } else {
       insights = "서버에 GOOGLE_API_KEY가 설정되어 있지 않아 AI 분석을 건너뛰었습니다.\n\n[강점]\n- 데이터 분석 완료: 기초적인 통계 분석이 완료되었습니다.";
