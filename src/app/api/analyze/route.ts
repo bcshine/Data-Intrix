@@ -86,17 +86,15 @@ export async function POST(req: NextRequest) {
       fs.writeFileSync(tempCsvPath, csvRows.join('\n'), 'utf-8');
     }
 
-    // 3. 파이썬 스크립트 실행 (통계 분석 및 워드 파일 생성)
+    // 3. 통합 파이썬 분석 스크립트 실행
     let pythonOutput = '';
     try {
-      // 가상환경이나 글로벌 파이썬 호출
-      const analyzerCmd = `python analyzer.py temp_widedata.csv`;
-      const reportCmd = `python report_generator.py analysis_results.json DataIntrix_Consulting_Report.docx`;
+      const analyzerCmd = `python main_analyzer.py temp_widedata.csv`;
       
-      console.log('Running python scripts...');
-      await execAsync(analyzerCmd, { cwd: projectRoot });
-      await execAsync(reportCmd, { cwd: projectRoot });
-      pythonOutput = '분석 리포트 생성 완료';
+      console.log('Running integrated analysis...');
+      const { stdout, stderr } = await execAsync(analyzerCmd, { cwd: projectRoot });
+      if (stderr) console.warn('Python Warning:', stderr);
+      pythonOutput = stdout;
     } catch (e: any) {
       console.error('Python execution error:', e);
       pythonOutput = `Python Error: ${e.message}`;
