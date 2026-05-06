@@ -166,13 +166,27 @@ export default function Home() {
     </main>
   );
 
+  const exportToWord = () => {
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export</title></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + document.getElementById("report-wrapper")?.innerHTML + footer;
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = '매출분석_전략리포트.doc';
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
+  };
+
   /* ── 리포트 화면 ── */
   return (
     <main style={{background:'#e2e8f0',padding:'2rem 1rem',minHeight:'100vh'}}>
-      <div style={wrap}>
+      <div id="report-wrapper" style={wrap}>
 
         {/* 표지 */}
-        <div style={{textAlign:'center',padding:'3rem 0 2rem',borderBottom:`4px solid ${C.navy}`}}>
+        <div style={{position: 'relative', textAlign:'center',padding:'3rem 0 2rem',borderBottom:`4px solid ${C.navy}`}}>
+          <button onClick={exportToWord} style={{position: 'absolute', top: '1.5rem', right: '0', background: C.navy, color: '#fff', border: 'none', padding: '0.6rem 1rem', borderRadius: 4, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>워드로 내보내기 📄</button>
           <p style={{color:C.sub,fontSize:'0.85rem',fontWeight:600,margin:'0 0 0.8rem',letterSpacing:2}}>CONFIDENTIAL · BUSINESS INTELLIGENCE REPORT</p>
           <h1 style={{fontSize:'2.2rem',fontWeight:900,color:C.navy,margin:'0 0 0.5rem',lineHeight:1.3}}>매출 데이터 분석 및<br/>전략 리포트</h1>
           <p style={{color:C.blue,fontSize:'1rem',fontWeight:700,margin:'0 0 2rem'}}>{fileName.replace(/\.[^/.]+$/,'')}</p>
