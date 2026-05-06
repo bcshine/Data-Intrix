@@ -146,12 +146,11 @@ export async function POST(req: NextRequest) {
     statsData.regression_simple.sort((a: any, b: any) => b.R_squared - a.R_squared);
 
     let insights = '';
-    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-    if (apiKey) {
+    const rawKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || '';
+    const apiKey = rawKey.trim().replace(/['"]/g, '');
+    
+    if (apiKey && apiKey !== 'undefined') {
       try {
-        const genAI = new GoogleGenerativeAI(apiKey.trim().replace(/['"]/g, ''));
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-thinking-exp-1219" });
-        
         const topDrivers = statsData.regression_simple.slice(0, 3).map((r:any) => r.메뉴변수).join(', ');
         const unstable = statsData.cv_stats.slice(-2).map((r:any) => r.메뉴).join(', ');
         
@@ -167,8 +166,18 @@ export async function POST(req: NextRequest) {
         2. 각 섹션 내에서는 '항목명: 설명' 구조의 불릿 포인트로 작성.
         3. 핵심 동인과 불안정 메뉴를 구체적으로 언급할 것.`;
 
-        const result = await model.generateContent(prompt);
-        insights = result.response.text();
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) {
+           throw new Error(data.error?.message || JSON.stringify(data));
+        }
+        
+        insights = data.candidates[0].content.parts[0].text;
       } catch (e: any) {
         console.error("AI Error:", e);
         insights = `AI 인사이트 생성 오류: ${e.message || String(e)}\n\n(Vercel 서버에서 발생한 실제 에러입니다. 이 화면을 알려주시면 바로 해결해 드리겠습니다.)`;
