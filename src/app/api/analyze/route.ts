@@ -170,16 +170,20 @@ Requirements:
     const externalCategories: string[] = [];
     let targetCol = '';
 
-    const targetKeywords = ['총매출', 'Total_Sales', 'Total Sales', '매출액', '합계'];
+    const targetKeywords = ['총매출', '총 매출', 'Total_Sales', 'Total Sales', '매출액', '합계', 'Total'];
     const externalKeywords = ['여부', '행사', '기온', '온도', '강수', '날씨', '마케팅', '광고', 'Promotion', 'Temp', 'Rain', 'Event', 'Weekend', '요일'];
 
     Array.from(allCategories).forEach(cat => {
-      if (targetKeywords.includes(cat)) {
+      if (targetKeywords.includes(cat.trim())) {
         targetCol = cat;
         return;
       }
       
-      const vec = wideData.map(r => r[cat] || 0);
+      const vec = wideData.map(r => {
+        const val = r[cat];
+        if (typeof val === 'string') return Number(val.replace(/,/g, '')) || 0;
+        return Number(val) || 0;
+      });
       const maxVal = Math.max(...vec);
       const isBinary = vec.every(v => v === 0 || v === 1);
       const isExternalName = externalKeywords.some(kw => cat.includes(kw));
@@ -196,19 +200,28 @@ Requirements:
     const tsData: number[] = [];
 
     wideData.forEach((row) => {
-      // 타겟 컬럼이 이미 있으면 그것을 사용, 없으면 메뉴 카테고리만 합산
+      // 모든 값을 숫자로 강제 변환 (콤마 제거 포함)
+      Object.keys(row).forEach(k => {
+        if (k !== 'Period_Start' && typeof row[k] === 'string') {
+          row[k] = Number(row[k].replace(/,/g, '')) || 0;
+        } else if (k !== 'Period_Start') {
+          row[k] = Number(row[k]) || 0;
+        }
+      });
+
       let rowTotal = 0;
       if (targetCol && row[targetCol] !== undefined) {
-        rowTotal = row[targetCol];
+        rowTotal = Number(row[targetCol]) || 0;
       } else {
         menuCategories.forEach(cat => {
-          rowTotal += (row[cat] || 0);
+          rowTotal += Number(row[cat]) || 0;
         });
       }
       row.Total_Sales = rowTotal;
       totalSalesAccum += rowTotal;
       tsData.push(rowTotal);
     });
+
 
 
     // 2. 순수 JS 통계 분석 (simple-statistics 활용)
@@ -223,10 +236,13 @@ Requirements:
       externalCategories
     };
 
-    // 통계 추출용 벡터 준비
+    // 통계 추출용 벡터 준비 (모든 값은 이미 숫자로 변환됨)
     const catVectors: Record<string, number[]> = {};
-    [...menuCategories, ...externalCategories].forEach(cat => { catVectors[cat] = wideData.map(r => r[cat] || 0); });
+    [...menuCategories, ...externalCategories].forEach(cat => { 
+      catVectors[cat] = wideData.map(r => Number(r[cat]) || 0); 
+    });
     catVectors['Total_Sales'] = tsData;
+
 
     // 추세 (Trend)
     if (tsData.length > 1) {
