@@ -162,8 +162,8 @@ export async function POST(req: NextRequest) {
         - 불안정 메뉴(매출 기복 심함): ${unstable}
         
         [작성 규칙]
-        1. [강점], [약점], [개선 방향] 섹션으로 나누어 작성.
-        2. 각 섹션 내에서는 '항목명: 설명' 구조의 불릿 포인트로 작성.
+        1. 반드시 [강점], [약점], [개선 방향] 3가지 섹션으로 나누어 작성할 것. (대괄호 필수, 마크다운 ** 기호 절대 금지)
+        2. 각 섹션 내에서는 '- 항목명: 설명' 구조의 평문 불릿 포인트로 작성할 것 (* 기호 대신 - 사용).
         3. 핵심 동인과 불안정 메뉴를 구체적으로 언급할 것.`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -177,7 +177,9 @@ export async function POST(req: NextRequest) {
            throw new Error(data.error?.message || JSON.stringify(data));
         }
         
-        insights = data.candidates[0].content.parts[0].text;
+        let rawInsights = data.candidates[0].content.parts[0].text;
+        // 마크다운 잔재(**, ## 등) 및 글머리기호(*)를 프론트엔드 파서에 맞게 강제 변환
+        insights = rawInsights.replace(/\*\*/g, '').replace(/## /g, '').replace(/^\* /gm, '- ');
       } catch (e: any) {
         console.error("AI Error:", e);
         insights = `AI 인사이트 생성 오류: ${e.message || String(e)}\n\n(Vercel 서버에서 발생한 실제 에러입니다. 이 화면을 알려주시면 바로 해결해 드리겠습니다.)`;
