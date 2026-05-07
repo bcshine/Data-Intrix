@@ -69,16 +69,14 @@ export async function POST(req: NextRequest) {
         if (!monthlyAgg[pStart]) monthlyAgg[pStart] = { Period_Start: pStart };
         validRowsCount++;
 
-        // 나머지 모든 컬럼(메뉴)의 매출액을 해당 월에 누적 합산 (총매출, 비고 컬럼 등은 분석에서 제외)
+        // 나머지 모든 컬럼의 매출액을 해당 월에 누적 합산
         for (const key of Object.keys(row)) {
-          if (key === dateKey || /총매출|총 매출|합계|total|비고|Period_End/i.test(key)) continue;
-          
-          let catName = key;
-          if (catName.startsWith('Amt_')) catName = catName.replace('Amt_', '').replace(/_/g, ' ');
+          if (key === dateKey || /비고|Period_End/i.test(key)) continue;
           
           const val = cleanNumeric(row[key]);
-          monthlyAgg[pStart][catName] = (monthlyAgg[pStart][catName] || 0) + val;
+          monthlyAgg[pStart][key] = (monthlyAgg[pStart][key] || 0) + val;
         }
+
       }
       
       if (validRowsCount > 0) {
@@ -200,15 +198,6 @@ Requirements:
     const tsData: number[] = [];
 
     wideData.forEach((row) => {
-      // 모든 값을 숫자로 강제 변환 (콤마 제거 포함)
-      Object.keys(row).forEach(k => {
-        if (k !== 'Period_Start' && typeof row[k] === 'string') {
-          row[k] = Number(row[k].replace(/,/g, '')) || 0;
-        } else if (k !== 'Period_Start') {
-          row[k] = Number(row[k]) || 0;
-        }
-      });
-
       let rowTotal = 0;
       if (targetCol && row[targetCol] !== undefined) {
         rowTotal = Number(row[targetCol]) || 0;
@@ -221,6 +210,7 @@ Requirements:
       totalSalesAccum += rowTotal;
       tsData.push(rowTotal);
     });
+
 
 
 
